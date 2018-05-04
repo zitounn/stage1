@@ -176,9 +176,10 @@ class Unet(object):
     :param cost_kwargs: (optional) kwargs passed to the cost function. See Unet._get_cost for more options
     """
     
-    def __init__(self, channels=3, n_class=2, cost="cross_entropy", cost_kwargs={}, **kwargs):
+    def __init__(self, channels=3, n_class=2, cost="cross_entropy", gpu_ratio = 1, cost_kwargs={}, **kwargs):
+
         tf.reset_default_graph()
-        
+        self.gpu_rat = gpu_ratio 
         self.n_class = n_class
         self.summaries = kwargs.get("summaries", True)
         
@@ -257,7 +258,7 @@ class Unet(object):
 
 
 
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.3)
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.gpu_rat)
 
         with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
             # Initialize variables
@@ -309,8 +310,9 @@ class Trainer(object):
     
     verification_batch_size = 4
     
-    def __init__(self, net, batch_size=1, norm_grads=False, optimizer="momentum", opt_kwargs={}):
+    def __init__(self, net, batch_size=1, norm_grads=False, optimizer="momentum", gpu_ratio = 1, opt_kwargs={}):
         self.net = net
+        self.gpu_rat = gpu_ratio
         self.batch_size = batch_size
         self.norm_grads = norm_grads
         self.optimizer = optimizer
@@ -401,7 +403,7 @@ class Trainer(object):
 
 
 
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.3)
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.gpu_rat)
 
         with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
 
