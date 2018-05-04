@@ -98,7 +98,6 @@ def create_image_and_label(nx,ny, cnt = 10, r_min = 5, r_max = 50, border = 92, 
     image += np.random.normal(scale=sigma, size=image.shape)
     image -= np.amin(image)
     image /= np.amax(image)
-    
     if rectangles:
         return image, label
     else:
