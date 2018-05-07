@@ -185,9 +185,7 @@ class ImageDataProvider(BaseDataProvider):
         array = np.array(Image.open(path), dtype)
 		
         if 'mask' in path:	
-            print(path)     
             if np.sum(array) < 1:
-                print('no masking') 
                 label_tensor = np.zeros((1024,1024,2))
                 array_background = np.ones((1024,1024))
                 array_segmentation = np.zeros((1024,1024))
@@ -197,11 +195,9 @@ class ImageDataProvider(BaseDataProvider):
                 array = label_tensor
 
             else:
-                print('With masking')
                 nonzero_label = np.zeros((1024,1024,2))
                 segmentation = array
                 background = 1-array
-                print(np.sum(array))
                 
                 nonzero_label[:,:,0] = background
                 nonzero_label[:,:,1] = segmentation	
@@ -285,7 +281,6 @@ class NoduleDataProvider(BaseDataProvider):
 		
         if 'mask' in path:	
             if np.sum(array) < 1:
-                print('no masking') 
                 label_tensor = np.zeros((1024,1024,2))
                 array_background = np.ones((1024,1024))
                 array_segmentation = np.zeros((1024,1024))
