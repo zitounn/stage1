@@ -90,146 +90,29 @@ class BaseDataProvider(object):
         """
         return data, labels
     
-    def __call__(self, n):
-        train_data, labels = self._load_data_and_label()
-        nx = train_data.shape[1]
-        ny = train_data.shape[2]
-    
-        X = np.zeros((n, nx, ny, self.channels))
-        Y = np.zeros((n, nx, ny, self.n_class))
-    
-        X[0] = train_data
-        Y[0] = labels
-        for i in range(1, n):
+    def __call__(self, n, verification = False):
+        
+        if verification == False:
             train_data, labels = self._load_data_and_label()
-            X[i] = train_data
-            Y[i] = labels
-    
-        return X, Y
-    
-class SimpleDataProvider(BaseDataProvider):
-    """
-    A simple data provider for numpy arrays. 
-    Assumes that the data and label are numpy array with the dimensions
-    data `[n, X, Y, channels]`, label `[n, X, Y, classes]`. Where
-    `n` is the number of images, `X`, `Y` the size of the image.
-
-    :param data: data numpy array. Shape=[n, X, Y, channels]
-    :param label: label numpy array. Shape=[n, X, Y, classes]
-    :param a_min: (optional) min value used for clipping
-    :param a_max: (optional) max value used for clipping
-    :param channels: (optional) number of channels, default=1
-    :param n_class: (optional) number of classes, default=2
-    
-    """
-    
-    def __init__(self, data, label, a_min=None, a_max=None, channels=1, n_class = 2):
-        super(SimpleDataProvider, self).__init__(a_min, a_max)
-        self.data = data
-        self.label = label
-        self.file_count = data.shape[0]
-        self.n_class = n_class
-        self.channels = channels
-
-    def _next_data(self):
-        idx = np.random.choice(self.file_count)
-        return self.data[idx], self.label[idx]
-
-
-class ImageDataProvider(BaseDataProvider):
-    """
-    Generic data provider for images, supports gray scale and colored images.
-    Assumes that the data images and label images are stored in the same folder
-    and that the labels have a different file suffix 
-    e.g. 'train/fish_1.tif' and 'train/fish_1_mask.tif'
-
-    Usage:
-    data_provider = ImageDataProvider("..fishes/train/*.tif")
+            nx = train_data.shape[1]
+            ny = train_data.shape[2]
         
-    :param search_path: a glob search pattern to find all data and label images
-    :param a_min: (optional) min value used for clipping
-    :param a_max: (optional) max value used for clipping
-    :param data_suffix: suffix pattern for the data images. Default '.tif'
-    :param mask_suffix: suffix pattern for the label images. Default '_mask.tif'
-    :param shuffle_data: if the order of the loaded file path should be randomized. Default 'True'
-    :param channels: (optional) number of channels, default=1
-    :param n_class: (optional) number of classes, default=2
-    
-    """
-    
-    def __init__(self, search_path, a_min=None, a_max=None, data_suffix=".tif", mask_suffix='_mask.tif', shuffle_data=True, n_class = 2):
-        super(ImageDataProvider, self).__init__(a_min, a_max)
-        self.data_suffix = data_suffix
-        self.mask_suffix = mask_suffix
-        self.file_idx = -1
-        self.shuffle_data = shuffle_data
-        self.n_class = n_class
+            X = np.zeros((n, nx, ny, self.channels))
+            Y = np.zeros((n, nx, ny, self.n_class))
         
-        self.data_files = self._find_data_files(search_path)
+            X[0] = train_data
+            Y[0] = labels
+            for i in range(1, n):
+                train_data, labels = self._load_data_and_label()
+                X[i] = train_data
+                Y[i] = labels
         
-        if self.shuffle_data:
-            np.random.shuffle(self.data_files)
-        
-        assert len(self.data_files) > 0, "No training files"
-        
-        img = self._load_file(self.data_files[0])
-        
-        self.channels = 1 if len(img.shape) == 2 else img.shape[-1]
+            return X, Y
+        else:
 
-    def _find_data_files(self, search_path):
-        all_files = glob.glob(search_path)
-        return [name for name in all_files if self.data_suffix in name and not self.mask_suffix in name]
-    
-    
-    def _load_file(self, path, dtype=np.float32):
-        array = np.array(Image.open(path), dtype)
-		
-        if 'mask' in path:	
-            if np.sum(array) < 1:
-                label_tensor = np.zeros((1024,1024,2))
-                array_background = np.ones((1024,1024))
-                array_segmentation = np.zeros((1024,1024))
-            
-                label_tensor[:,:,0] = array_background
-                label_tensor[:,:,1] = array_segmentation
-                array = label_tensor
+            return self._load_verification_data()
 
-            else:
-                nonzero_label = np.zeros((1024,1024,2))
-                segmentation = array
-                background = 1-array
                 
-                nonzero_label[:,:,0] = background
-                nonzero_label[:,:,1] = segmentation	
-                array = nonzero_label
-
-        return  array
-        #return np.squeeze(cv2.imread(image_name, cv2.IMREAD_GRAYSCALE))
-
-    def _cylce_file(self):
-        self.file_idx += 1
-        if self.file_idx >= len(self.data_files):
-            self.file_idx = 0 
-            if self.shuffle_data:
-                np.random.shuffle(self.data_files)
-        
-    def _next_data(self):
-        self._cylce_file()
-        image_name = self.data_files[self.file_idx]
-        label_name = image_name.replace(self.data_suffix, self.mask_suffix)
-        
-        img = self._load_file(image_name, np.float32)
-        label = self._load_file(label_name, np.bool)
-    
-        return img,label
-
-
-
-
-
-
-
-
 
 class NoduleDataProvider(BaseDataProvider):
     """
@@ -252,7 +135,7 @@ class NoduleDataProvider(BaseDataProvider):
     
     """
     
-    def __init__(self, search_path, a_min=None, a_max=None, data_suffix=".tif", mask_suffix='_mask.tif', shuffle_data=True, n_class = 2):
+    def __init__(self, search_path, verification_path, a_min=None, a_max=None, data_suffix=".tif", mask_suffix='_mask.tif', shuffle_data=True, n_class = 2):
         super(NoduleDataProvider, self).__init__(a_min, a_max)
         self.data_suffix = data_suffix
         self.mask_suffix = mask_suffix
@@ -261,6 +144,8 @@ class NoduleDataProvider(BaseDataProvider):
         self.n_class = n_class
         
         self.data_files = self._find_data_files(search_path)
+        
+        self.data_verification = self._find_verification_files(verification_path)
         
         if self.shuffle_data:
             np.random.shuffle(self.data_files)
@@ -275,6 +160,9 @@ class NoduleDataProvider(BaseDataProvider):
         all_files = glob.glob(search_path)
         return [name for name in all_files if self.data_suffix in name and not self.mask_suffix in name]
     
+    def _find_verification_files(self, verification_path):
+        all_files = glob.glob(verification_path)
+        return [name for name in all_files if self.data_suffix in name and not self.mask_suffix in name]
     
     def _load_file(self, path, dtype=np.float32):
         array = np.array(Image.open(path), dtype)
@@ -301,6 +189,40 @@ class NoduleDataProvider(BaseDataProvider):
         return  array
         #return np.squeeze(cv2.imread(image_name, cv2.IMREAD_GRAYSCALE))
 
+    def _load_verification_data(self):
+        n = len(self.data_verification)
+        for ver_size in range(n):
+            image_name = self.data_verification[ver_size]
+            label_name = image_name.replace(self.data_suffix, self.mask_suffix)
+            
+            img = self._load_file(image_name, np.float32)
+            label = self._load_file(label_name, np.float32)
+            
+            
+            
+            nx = img.shape[1]
+            ny = img.shape[0]
+
+            img, label =  img.reshape(1, ny, nx, self.channels), label.reshape(1, ny, nx, self.n_class)
+            
+         
+            
+            if ver_size ==0:
+                nx = img.shape[1]
+                ny = img.shape[2]
+    
+                X = np.zeros((n, nx, ny, self.channels))
+                Y = np.zeros((n, nx, ny, self.n_class))
+    
+            X[ver_size] = img
+            Y[ver_size] = label
+        
+        
+        return X, Y
+            
+              
+            
+            
     def _cylce_file(self):
         self.file_idx += 1
         if self.file_idx >= len(self.data_files):
