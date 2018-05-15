@@ -15,7 +15,7 @@
 author: jakeret
 '''
 from __future__ import print_function, division, absolute_import, unicode_literals
-
+import scipy.misc 
 #import cv2
 import glob
 import numpy as np
@@ -107,10 +107,16 @@ class BaseDataProvider(object):
                 X[i] = train_data
                 Y[i] = labels
         
-            return X, Y
+            
         else:
 
-            return self._load_verification_data()
+            X, Y =  self._load_verification_data()
+            
+            
+            
+            print (X.shape)
+        
+        return X, Y
 
                 
 
@@ -135,13 +141,14 @@ class NoduleDataProvider(BaseDataProvider):
     
     """
     
-    def __init__(self, search_path, verification_path, a_min=None, a_max=None, data_suffix=".tif", mask_suffix='_mask.tif', shuffle_data=True, n_class = 2):
+    def __init__(self, search_path, verification_path, downsample = 1, a_min=None, a_max=None, data_suffix=".tif", mask_suffix='_mask.tif', shuffle_data=True, n_class = 2):
         super(NoduleDataProvider, self).__init__(a_min, a_max)
         self.data_suffix = data_suffix
         self.mask_suffix = mask_suffix
         self.file_idx = -1
         self.shuffle_data = shuffle_data
         self.n_class = n_class
+        self.downsample = downsample
         
         self.data_files = self._find_data_files(search_path)
         
@@ -166,19 +173,25 @@ class NoduleDataProvider(BaseDataProvider):
     
     def _load_file(self, path, dtype=np.float32):
         array = np.array(Image.open(path), dtype)
+        
+        if self.downsample <1:
+            array= scipy.misc.imresize(array, self.downsample)
+        
+        size = array.shape[0]
+     
 		
         if 'mask' in path:	
             if np.sum(array) < 1:
-                label_tensor = np.zeros((1024,1024,2))
-                array_background = np.ones((1024,1024))
-                array_segmentation = np.zeros((1024,1024))
+                label_tensor = np.zeros((size,size,2))
+                array_background = np.ones((size,size))
+                array_segmentation = np.zeros((size,size))
             
                 label_tensor[:,:,0] = array_background
                 label_tensor[:,:,1] = array_segmentation
                 array = label_tensor
 
             else:
-                nonzero_label = np.zeros((1024,1024,2))
+                nonzero_label = np.zeros((size,size,2))
                 segmentation = array
                 background = 1-array
                 
