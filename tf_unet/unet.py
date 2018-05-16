@@ -233,9 +233,9 @@ class Unet(object):
                                                                               labels=flat_labels))
         elif cost_name == "dice_coefficient":
             eps = 1e-5
-            prediction = pixel_wise_softmax_2(logits)
-            intersection = tf.reduce_sum(prediction * self.y)
-            union =  eps + tf.reduce_sum(prediction) + tf.reduce_sum(self.y)
+            prediction = pixel_wise_softmax_2(logits)          
+            intersection = tf.reduce_sum(prediction[:,:,:,1] * self.y[:,:,:,1])
+            union =  eps + tf.reduce_sum(prediction[:,:,:,1]) + tf.reduce_sum(self.y[:,:,:,1])
             loss = -(2 * intersection/ (union))
             
         else:
@@ -450,36 +450,17 @@ class Trainer(object):
                     total_loss += loss
 
                 self.output_epoch_stats(epoch, total_loss, training_iters, lr)
-                self.store_prediction(sess, test_x, test_y, "epoch_%s"%epoch, iters = training_iters, acu_loss = total_loss)
+                self.store_prediction(sess, test_x, test_y, "epoch_%s"%epoch, iters = training_iters, acu_loss = total_loss, output_name = output_path)
                     
                 save_path = self.net.save(sess, save_path)
             logging.info("Optimization Finished!")
             
             return save_path
+                                      
         
         
-    
-    def loss_to_csv(self, total_loss, training_iters, validation_loss):
-            average_loss = total_loss/training_iters
-            
-            if os.path.isfile('loss_validation.csv') :
-                loss_data = genfromtxt('loss_validation.csv', delimiter=',')
-                
-                loss_data = np.vstack([loss_data, [average_loss, validation_loss]])
-                
-                np.savetxt("loss_validation.csv", loss_data, delimiter=",")
-            
-            else:
-                loss_data = np.array([average_loss, validation_loss])
-                np.savetxt("loss_validation.csv", loss_data, delimiter=",")
-                     
-        
-        
-        
-    def store_prediction(self, sess, batch_x, batch_y, name, iter=0, acu_loss=0):
-        
-        
-        
+    def store_prediction(self, sess, batch_x, batch_y, name, iters=0, acu_loss=0, output_name = 'test_wr'):
+                 
         prediction = sess.run(self.net.predicter, feed_dict={self.net.x: batch_x, 
                                                              self.net.y: batch_y, 
                                                              self.net.keep_prob: 1.})
@@ -495,12 +476,31 @@ class Trainer(object):
                                                                           loss))
               
         img = util.combine_img_prediction(batch_x, batch_y, prediction)
-        util.save_image(img, "%s/%s.jpg"%(self.prediction_path, name))
         
-        lose_to_csv(acu_loss, iters, loss)
+        #Uncomment to test network save images of net prediction on validation set.
+        #util.save_image(img, "%s/%s.jpg"%(self.prediction_path, name))
+        
+        if iters != 0 and acu_loss != 0:
+            self.loss_to_csv(acu_loss, iters, loss, output_name)
+        
         
         
         return pred_shape
+    
+    def loss_to_csv(self, total_loss, training_iters, validation_loss, output_name):
+            average_loss = total_loss/training_iters
+            
+            if os.path.isfile(output_name+'.csv') :
+                loss_data = genfromtxt(output_name+'.csv', delimiter=',')
+                
+                loss_data = np.vstack([loss_data, [average_loss, validation_loss]])
+                
+                np.savetxt(output_name+'.csv', loss_data, delimiter=",")
+            
+            else:
+                loss_data = np.array([average_loss, validation_loss])
+                np.savetxt(output_name+'.csv', loss_data, delimiter=",")
+    
     
     def output_epoch_stats(self, epoch, total_loss, training_iters, lr):
         logging.info("Epoch {:}, Average loss: {:.4f}, learning rate: {:.4f}".format(epoch, (total_loss / training_iters), lr))
