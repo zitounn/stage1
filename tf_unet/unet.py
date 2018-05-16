@@ -16,6 +16,8 @@
 Created on Jul 28, 2016
 
 author: jakeret
+
+edits: Moncef
 '''
 from __future__ import print_function, division, absolute_import, unicode_literals
 
@@ -24,6 +26,7 @@ import shutil
 import numpy as np
 from collections import OrderedDict
 import logging
+from numpy import genfromtxt
 
 import tensorflow as tf
 
@@ -447,14 +450,36 @@ class Trainer(object):
                     total_loss += loss
 
                 self.output_epoch_stats(epoch, total_loss, training_iters, lr)
-                self.store_prediction(sess, test_x, test_y, "epoch_%s"%epoch)
+                self.store_prediction(sess, test_x, test_y, "epoch_%s"%epoch, iters = training_iters, acu_loss = total_loss)
                     
                 save_path = self.net.save(sess, save_path)
             logging.info("Optimization Finished!")
             
             return save_path
         
-    def store_prediction(self, sess, batch_x, batch_y, name):
+        
+    
+    def loss_to_csv(self, total_loss, training_iters, validation_loss):
+            average_loss = total_loss/training_iters
+            
+            if os.path.isfile('loss_validation.csv') :
+                loss_data = genfromtxt('loss_validation.csv', delimiter=',')
+                
+                loss_data = np.vstack([loss_data, [average_loss, validation_loss]])
+                
+                np.savetxt("loss_validation.csv", loss_data, delimiter=",")
+            
+            else:
+                loss_data = np.array([average_loss, validation_loss])
+                np.savetxt("loss_validation.csv", loss_data, delimiter=",")
+                     
+        
+        
+        
+    def store_prediction(self, sess, batch_x, batch_y, name, iter=0, acu_loss=0):
+        
+        
+        
         prediction = sess.run(self.net.predicter, feed_dict={self.net.x: batch_x, 
                                                              self.net.y: batch_y, 
                                                              self.net.keep_prob: 1.})
@@ -471,6 +496,9 @@ class Trainer(object):
               
         img = util.combine_img_prediction(batch_x, batch_y, prediction)
         util.save_image(img, "%s/%s.jpg"%(self.prediction_path, name))
+        
+        lose_to_csv(acu_loss, iters, loss)
+        
         
         return pred_shape
     
