@@ -267,6 +267,21 @@ def _augment(image, mask):
     
 
     return image, mask
+    
+    
+def loss_to_csv(total_loss, validation_loss, output_name):
+
+            
+    if os.path.isfile(output_name+'.csv') :
+        loss_data = genfromtxt(output_name+'.csv', delimiter=',')
+                
+        loss_data = np.vstack([loss_data, [total_loss, validation_loss]])
+                
+        np.savetxt(output_name+'.csv', loss_data, delimiter=",")
+            
+    else:
+        loss_data = np.array([total_loss, validation_loss])
+        np.savetxt(output_name+'.csv', loss_data, delimiter=",")
 
 
 def main(flags):
@@ -274,10 +289,13 @@ def main(flags):
     n_train = 200
 
     tf_dataset = data_processing('train.csv')
-
     tf_dataset_no_aug = tf_dataset.map(_parser_function)
-
     tf_dataset_images_augmented = tf_dataset_no_aug
+    
+    tf_valid_dataset = data_processing('test.csv')
+    tf_valid_pars = tf_valid_dataset.map(_parser_function)
+    
+    
     
     for n in range(aug_n):
         augmented = tf_dataset_no_aug.map(_augment)
@@ -285,15 +303,19 @@ def main(flags):
 
 
     tf_dataset_images = tf_dataset_images_augmented
-
     tf_dataset_images = tf_dataset_images.shuffle(500).repeat().batch(4)
+    
+    tf_valid_pars = tf_valid_pars.shuffle(500).repeat().batch(4)
+    
+    
 
 
     iterator = tf.data.Iterator.from_structure(tf_dataset_images.output_types, tf_dataset_images.output_shapes)
-
     next_element = iterator.get_next()
 
     training_init_op  = iterator.make_initializer(tf_dataset_images)
+    
+    validation_init_op = iterator.make_initializer(tf_valid_pars)
 
     X = next_element[0]
     y  = next_element[1]
@@ -357,7 +379,8 @@ def main(flags):
             threads = tf.train.start_queue_runners(coord=coord)
 
             for epoch in range(flags.epochs):
-
+                
+                tot_iou = 0
                 for step in range(0, n_train, flags.batch_size):
 
                     sess.run(training_init_op)
@@ -365,25 +388,35 @@ def main(flags):
                     _, step_iou, step_summary, global_step_value = sess.run(
                         [train_op, IOU_op, summary_op, global_step],
                         feed_dict={mode: True})
+                    
+                    tot_iou+= step_iou
 
                     train_summary_writer.add_summary(step_summary,
                                                      global_step_value)
+                                                    
+                                                        
+                
+                print("Epoch: {}, mean IOU {}%".format(epoch, avg_acc / (32/flags.batch_size)) )
 
-                '''
+                sess.run(validation_init_op)
                 total_iou = 0
-                for step in range(0, n_test, flags.batch_size):
-                    X_test, y_test = sess.run([X_test_op, y_test_op])
+                avg_acc = 0
+                for step in range(0, 32, flags.batch_size):
+                    
                     step_iou, step_summary = sess.run(
                         [IOU_op, summary_op],
-                        feed_dict={X: X_test,
-                                   y: y_test,
-                                   mode: False})
+                        feed_dict={mode: False})
 
                     total_iou += step_iou * X_test.shape[0]
+                    avg_acc += avg_acc
 
                     test_summary_writer.add_summary(step_summary,
                                                     (epoch + 1) * (step + 1))
-                '''
+                                                    
+                print("Average validation set mean IOU {}%".format((avg_acc / (32/flags.batch_size))))
+                
+                loss_to_csv(avg_acc/(32/flags.batch_size), avg_acc/(32/flags.batch_size), 'test_valid_test')   
+                
 
             saver.save(sess, "{}/model.ckpt".format(flags.ckdir))
 
