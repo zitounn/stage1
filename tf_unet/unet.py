@@ -238,6 +238,16 @@ class Unet(object):
             union =  eps + tf.reduce_sum(prediction[:,:,:,1]) + tf.reduce_sum(self.y[:,:,:,1])
             loss = -(2 * intersection/ (union))
             
+        elif cost_name == "IOU":
+            eps = 1e-5
+            prediction = pixel_wise_softmax_2(logits)          
+            intersection = tf.reduce_sum(tf.mul(prediction[:,:,:,1] , self.y[:,:,:,1]))
+            
+            union =  eps + tf.reduce_sum(prediction[:,:,:,1]) + tf.reduce_sum(self.y[:,:,:,1])
+            loss = 1 - (intersection / union - intersection)
+                      
+            
+            
         else:
             raise ValueError("Unknown cost function: "%cost_name)
 
